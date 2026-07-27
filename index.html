@@ -716,6 +716,7 @@
           <button class="btn" id="generateShareLinkBtn">產生班表連結（不含工資）</button>
           <input type="text" id="shareLinkOutput" class="share-link-input" readonly aria-label="分享連結" placeholder="點擊左方按鈕，依「匯出區間」產生唯讀連結" />
           <button class="btn" id="copyShareLinkBtn">複製連結</button>
+          <button class="btn" id="shortenLinkBtn" title="用 TinyURL 縮短連結，方便傳訊息">縮短網址（TinyURL）</button>
           <span class="share-status" id="shareStatus"></span>
         </div>
       </div>
@@ -2059,6 +2060,19 @@
     output.focus();
     output.select();
     copyShareLink(output.value);
+  });
+
+  document.getElementById("shortenLinkBtn").addEventListener("click", function () {
+    var output = document.getElementById("shareLinkOutput");
+    if (!output.value) {
+      flashShareStatus("請先產生連結");
+      return;
+    }
+    // Opens TinyURL's own create endpoint as a normal page navigation (not a
+    // background fetch), so the schedule link is only sent to TinyURL when
+    // you actually click this button — never automatically.
+    window.open("https://tinyurl.com/api-create.php?url=" + encodeURIComponent(output.value), "_blank", "noopener");
+    flashShareStatus("已在新分頁開啟 TinyURL，稍等它會顯示縮短後的網址");
   });
 
   document.getElementById("summaryRangeStart").addEventListener("change", function (e) {
