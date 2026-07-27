@@ -393,6 +393,22 @@
     color: var(--muted);
   }
   .summary-range .sep { color: var(--muted); }
+  .share-link-input {
+    flex: 1 1 220px;
+    min-width: 140px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 5px 8px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .share-status {
+    font-size: 12px;
+    color: var(--ledger);
+    min-height: 1em;
+  }
   .btn {
     font-family: var(--font-body);
     font-size: 12.5px;
@@ -604,6 +620,13 @@
         <input type="date" id="scheduleExportEnd" class="date-field" aria-label="匯出結束日期" />
         <button class="btn" id="scheduleExportSyncWeekBtn" title="套用目前顯示的週次">套用目前週次</button>
         <button class="btn" id="exportScheduleCsvBtn">匯出班表 CSV</button>
+      </div>
+      <div class="summary-range">
+        <span>分享給工讀生</span>
+        <button class="btn" id="generateShareLinkBtn">產生班表連結（不含工資）</button>
+        <input type="text" id="shareLinkOutput" class="share-link-input" readonly aria-label="分享連結" placeholder="點擊左方按鈕，依「匯出區間」產生唯讀連結" />
+        <button class="btn" id="copyShareLinkBtn">複製連結</button>
+        <span class="share-status" id="shareStatus"></span>
       </div>
       <div class="grid-scroll">
         <table class="schedule-grid" id="scheduleGrid"></table>
@@ -1289,6 +1312,128 @@
     return { monday: monday, dayIndex: dayIndex };
   }
 
+  // ---------- Share link (read-only, wage-free schedule view for workers) ----------
+  // The payload below is built field-by-field from only name/color/station —
+  // it never touches w.rate or any wage total, so wage figures cannot leak
+  // through a shared link no matter how it's inspected or decoded.
+  function buildShareData() {
+    var range = getScheduleExportRange();
+    var dates = eachDateInRange(range.start, range.end);
+    var slots = getSlots();
+    var cells = {};
+    dates.forEach(function (dateIso) {
+      var wmd = weekMondayAndDayIndex(dateIso);
+      var weekSchedule = state.scheduleByWeek[wmd.monday] || {};
+      slots.forEach(function (slot) {
+        var cell = weekSchedule[cellKey(wmd.dayIndex, slot)] || {};
+        var assignments = Object.keys(cell).map(function (wid) {
+          var w = workerById(wid);
+          if (!w || w.include === false) return null;
+          var station = cell[wid] ? stationById(cell[wid]) : null;
+          if (station && station.include === false) return null;
+          return { n: w.name, c: w.color, s: station ? station.name : null, sc: station ? station.color : null };
+        }).filter(Boolean);
+        if (assignments.length) cells[dateIso + "_" + slot] = assignments;
+      });
+    });
+    return { start: range.start, end: range.end, slots: slots, cells: cells };
+  }
+
+  function encodeShareData(obj) {
+    var bytes = new TextEncoder().encode(JSON.stringify(obj));
+    var binary = "";
+    bytes.forEach(function (b) { binary += String.fromCharCode(b); });
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function decodeShareData(str) {
+    var b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    var binary = atob(b64);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
+
+  function renderShareView(data) {
+    var app = document.querySelector(".app");
+    app.innerHTML = "";
+
+    var header = document.createElement("header");
+    header.className = "topbar";
+    var titleWrap = document.createElement("div");
+    var h1 = document.createElement("h1");
+    h1.textContent = "工讀生排班表（唯讀檢視）";
+    var sub = document.createElement("div");
+    sub.className = "sub";
+    sub.textContent = formatMD(data.start) + " – " + formatMD(data.end) + "　只顯示排班，不包含工資資訊";
+    titleWrap.appendChild(h1);
+    titleWrap.appendChild(sub);
+    header.appendChild(titleWrap);
+    app.appendChild(header);
+
+    var main = document.createElement("main");
+    main.className = "panel schedule-panel";
+    var gridScroll = document.createElement("div");
+    gridScroll.className = "grid-scroll";
+    var table = document.createElement("table");
+    table.className = "schedule-grid";
+
+    var dates = eachDateInRange(data.start, data.end);
+
+    var thead = document.createElement("thead");
+    var headRow = document.createElement("tr");
+    var corner = document.createElement("th");
+    corner.className = "corner";
+    headRow.appendChild(corner);
+    dates.forEach(function (dateIso) {
+      var dayIndex = weekMondayAndDayIndex(dateIso).dayIndex;
+      var th = document.createElement("th");
+      if (WEEKEND_INDEXES.indexOf(dayIndex) !== -1) th.className = "weekend";
+      th.innerHTML =
+        "<span class=\"weekday\">" + DAYS[dayIndex] + "</span>" +
+        "<span class=\"date-sub\">" + formatMD(dateIso) + "</span>";
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement("tbody");
+    data.slots.forEach(function (slot) {
+      var tr = document.createElement("tr");
+      if (slot.slice(3) === "00") tr.className = "hour-start";
+      var timeLabel = document.createElement("th");
+      timeLabel.className = "time-label";
+      timeLabel.textContent = slot.slice(3) === "00" ? slot : "";
+      tr.appendChild(timeLabel);
+
+      dates.forEach(function (dateIso) {
+        var dayIndex = weekMondayAndDayIndex(dateIso).dayIndex;
+        var td = document.createElement("td");
+        td.className = "cell" + (WEEKEND_INDEXES.indexOf(dayIndex) !== -1 ? " weekend" : "");
+        var fill = document.createElement("div");
+        fill.className = "cell-fill";
+        var assignments = data.cells[dateIso + "_" + slot] || [];
+        assignments.forEach(function (a) {
+          var badge = document.createElement("span");
+          badge.className = "badge";
+          badge.style.background = a.c;
+          badge.style.boxShadow = a.sc ? "0 0 0 2px " + a.sc : "0 0 0 1px var(--line-strong)";
+          badge.title = a.n + (a.s ? "・" + a.s : "");
+          badge.textContent = a.n.slice(0, 1);
+          fill.appendChild(badge);
+        });
+        td.appendChild(fill);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    gridScroll.appendChild(table);
+    main.appendChild(gridScroll);
+    app.appendChild(main);
+  }
+
   function computeSummary() {
     var range = getSummaryRange();
     var totals = {};
@@ -1470,6 +1615,46 @@
     document.getElementById("scheduleExportEnd").value = state.scheduleExportRangeEnd;
   });
 
+  function flashShareStatus(text) {
+    var status = document.getElementById("shareStatus");
+    status.textContent = text;
+    setTimeout(function () {
+      if (status.textContent === text) status.textContent = "";
+    }, 4000);
+  }
+
+  function copyShareLink(url) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        function () { flashShareStatus("已複製連結！"); },
+        function () { flashShareStatus("連結已產生，請手動複製"); }
+      );
+    } else {
+      flashShareStatus("連結已產生，請手動複製");
+    }
+  }
+
+  document.getElementById("generateShareLinkBtn").addEventListener("click", function () {
+    var encoded = encodeShareData(buildShareData());
+    var url = location.origin + location.pathname + "#share=" + encoded;
+    var output = document.getElementById("shareLinkOutput");
+    output.value = url;
+    output.focus();
+    output.select();
+    copyShareLink(url);
+  });
+
+  document.getElementById("copyShareLinkBtn").addEventListener("click", function () {
+    var output = document.getElementById("shareLinkOutput");
+    if (!output.value) {
+      flashShareStatus("請先產生連結");
+      return;
+    }
+    output.focus();
+    output.select();
+    copyShareLink(output.value);
+  });
+
   document.getElementById("summaryRangeStart").addEventListener("change", function (e) {
     if (!e.target.value) return;
     state.summaryRangeStart = e.target.value;
@@ -1505,7 +1690,20 @@
     renderSummary();
   }
 
-  attachGridInteraction();
-  renderAll();
+  var shareMatch = /^#share=(.+)$/.exec(location.hash);
+  if (shareMatch) {
+    // Read-only worker view: render straight from the URL-encoded payload and
+    // skip the normal editor entirely — this device's own localStorage (if
+    // any) is never touched, and no wage data was ever included to show.
+    try {
+      renderShareView(decodeShareData(shareMatch[1]));
+    } catch (e) {
+      document.querySelector(".app").innerHTML =
+        "<p style=\"padding:40px;color:var(--muted);\">這個分享連結已失效或格式不正確，請跟排班人員索取新的連結。</p>";
+    }
+  } else {
+    attachGridInteraction();
+    renderAll();
+  }
 })();
 </script>
