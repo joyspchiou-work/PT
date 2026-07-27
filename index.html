@@ -1,0 +1,1511 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>工讀生排班表</title>
+<style>
+  :root {
+    --paper: #eef1ec;
+    --surface: #ffffff;
+    --ink: #1e2a24;
+    --muted: #5e6b63;
+    --line: #d6dbd2;
+    --line-strong: #c3cabe;
+    --brass: #a8752c;
+    --brass-tint: #a8752c1a;
+    --brass-tint-strong: #a8752c33;
+    --ledger: #2f6f5c;
+    --ledger-tint: #2f6f5c1a;
+    --rust: #a6432a;
+    --weekend-tint: #a8752c0d;
+    --shadow: 0 1px 2px rgba(30, 42, 36, 0.06), 0 4px 14px rgba(30, 42, 36, 0.05);
+    --radius: 10px;
+
+    --font-display: -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", "Helvetica Neue", sans-serif;
+    --font-body: -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", "Helvetica Neue", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Cascadia Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171b18;
+      --surface: #1f2521;
+      --ink: #eef1ec;
+      --muted: #9aa79d;
+      --line: #2c332d;
+      --line-strong: #3a4239;
+      --brass: #d9a54c;
+      --brass-tint: #d9a54c22;
+      --brass-tint-strong: #d9a54c3d;
+      --ledger: #6cbc9f;
+      --ledger-tint: #6cbc9f22;
+      --rust: #e08063;
+      --weekend-tint: #d9a54c14;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #171b18;
+    --surface: #1f2521;
+    --ink: #eef1ec;
+    --muted: #9aa79d;
+    --line: #2c332d;
+    --line-strong: #3a4239;
+    --brass: #d9a54c;
+    --brass-tint: #d9a54c22;
+    --brass-tint-strong: #d9a54c3d;
+    --ledger: #6cbc9f;
+    --ledger-tint: #6cbc9f22;
+    --rust: #e08063;
+    --weekend-tint: #d9a54c14;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1ec;
+    --surface: #ffffff;
+    --ink: #1e2a24;
+    --muted: #5e6b63;
+    --line: #d6dbd2;
+    --line-strong: #c3cabe;
+    --brass: #a8752c;
+    --brass-tint: #a8752c1a;
+    --brass-tint-strong: #a8752c33;
+    --ledger: #2f6f5c;
+    --ledger-tint: #2f6f5c1a;
+    --rust: #a6432a;
+    --weekend-tint: #a8752c0d;
+    --shadow: 0 1px 2px rgba(30, 42, 36, 0.06), 0 4px 14px rgba(30, 42, 36, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { min-height: 100vh; }
+  ::selection { background: var(--brass-tint-strong); }
+
+  .app {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  header.topbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+  }
+  header.topbar h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  header.topbar .sub {
+    color: var(--muted);
+    font-size: 13.5px;
+    margin-top: 4px;
+  }
+  header.topbar .range-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  header.topbar .range-controls input[type="time"] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 4px 6px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .sidebar-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  /* Workers & stations panels */
+  .workers-panel, .stations-panel { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .workers-panel h2, .stations-panel h2 {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+  .worker-list { display: flex; flex-direction: column; gap: 6px; }
+  .worker-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: transparent;
+  }
+  .worker-card:hover { background: var(--brass-tint); }
+  .worker-card.selected {
+    border-color: var(--brass);
+    background: var(--brass-tint);
+  }
+  .include-check {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--brass);
+    cursor: pointer;
+  }
+  .worker-dot {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex: none;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12);
+    cursor: pointer;
+  }
+  .worker-dot::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
+  .worker-dot::-webkit-color-swatch { border: none; border-radius: 50%; }
+  .worker-dot::-moz-color-swatch { border: none; border-radius: 50%; }
+  .worker-card .worker-name {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--ink);
+    padding: 2px 0;
+  }
+  .worker-card .worker-name:focus { outline: none; border-bottom: 1px solid var(--brass); }
+  .worker-card .worker-rate {
+    width: 62px;
+    flex: none;
+    text-align: right;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 12.5px;
+    color: var(--ink);
+    padding: 3px 5px;
+  }
+  .worker-card .worker-remove {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .worker-card .worker-remove:hover { background: var(--rust); color: #fff; }
+
+  .station-list { display: flex; flex-direction: column; gap: 6px; }
+  .station-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: transparent;
+  }
+  .station-card:hover { background: var(--brass-tint); }
+  .station-card.selected {
+    border-color: var(--brass);
+    background: var(--brass-tint);
+  }
+  .station-swatch {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    flex: none;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12);
+    cursor: pointer;
+  }
+  .station-swatch::-webkit-color-swatch-wrapper { padding: 0; border-radius: 4px; }
+  .station-swatch::-webkit-color-swatch { border: none; border-radius: 4px; }
+  .station-swatch::-moz-color-swatch { border: none; border-radius: 4px; }
+  .station-swatch.none {
+    background: transparent;
+    border: 1.5px dashed var(--line-strong);
+    box-shadow: none;
+    cursor: default;
+  }
+  .station-card .station-label {
+    flex: 1;
+    font-size: 14px;
+    color: var(--muted);
+    padding: 2px 0;
+  }
+  .station-card .station-name {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--ink);
+    padding: 2px 0;
+  }
+  .station-card .station-name:focus { outline: none; border-bottom: 1px solid var(--brass); }
+
+  .add-worker-btn, .add-station-btn {
+    margin-top: 2px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px dashed var(--line-strong);
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .add-worker-btn:hover, .add-station-btn:hover { border-color: var(--brass); color: var(--brass); }
+
+  .paintbrush-hint {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    padding: 8px 2px 0;
+    border-top: 1px solid var(--line);
+    margin-top: 2px;
+  }
+  .paintbrush-hint b { color: var(--ink); }
+
+  /* Schedule panel */
+  .schedule-panel { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .schedule-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .schedule-toolbar h2 {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+  .week-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .week-nav .week-step {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .week-nav .week-step:hover { border-color: var(--brass); color: var(--brass); }
+  .week-nav .week-range {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .date-field {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 12.5px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 4px 6px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .summary-range {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .summary-range .sep { color: var(--muted); }
+  .btn {
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    border-radius: 7px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 6px 11px;
+    cursor: pointer;
+  }
+  .btn:hover { border-color: var(--brass); color: var(--brass); }
+  .btn.danger:hover { border-color: var(--rust); color: var(--rust); }
+
+  .grid-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  table.schedule-grid {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    user-select: none;
+    table-layout: fixed;
+  }
+  table.schedule-grid th, table.schedule-grid td {
+    border: 1px solid var(--line);
+  }
+  table.schedule-grid thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 2;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 12.5px;
+    padding: 8px 4px;
+    color: var(--ink);
+  }
+  table.schedule-grid thead th.weekend { background: var(--weekend-tint); }
+  table.schedule-grid thead th.corner {
+    left: 0;
+    z-index: 3;
+    width: 56px;
+  }
+  table.schedule-grid thead th .weekday { display: block; }
+  table.schedule-grid thead th .date-sub {
+    display: block;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  table.schedule-grid thead th.today .weekday { color: var(--brass); }
+  table.schedule-grid thead th.today .date-sub { color: var(--brass); }
+  table.schedule-grid tbody th.time-label {
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 1;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    padding: 0 8px;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  table.schedule-grid tbody tr.hour-start th.time-label,
+  table.schedule-grid tbody tr.hour-start td { border-top: 1px solid var(--line-strong); }
+
+  td.cell {
+    height: 22px;
+    min-width: 78px;
+    cursor: pointer;
+    padding: 1px 2px;
+    background: var(--surface);
+  }
+  td.cell.weekend { background: var(--weekend-tint); }
+  td.cell:hover { background: var(--brass-tint); }
+  .cell-fill {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    height: 100%;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 700;
+    font-family: var(--font-body);
+    line-height: 1;
+  }
+
+  /* Summary panel */
+  .summary-panel { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .summary-panel .head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .summary-panel h2 {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+  table.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  table.summary-table th, table.summary-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+  }
+  table.summary-table th {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  table.summary-table td.num, table.summary-table th.num {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  table.summary-table tr.total-row td {
+    border-top: 2px solid var(--line-strong);
+    border-bottom: none;
+    font-weight: 700;
+    color: var(--ledger);
+  }
+  table.summary-table td.wage { color: var(--ledger); font-weight: 600; }
+  .empty-note {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 6px 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .worker-card, .station-card, .btn, td.cell { transition: background-color 120ms ease, border-color 120ms ease; }
+  }
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div>
+      <h1>工讀生排班表</h1>
+      <div class="sub">以半小時為單位安排班表，依各工讀生時薪自動計算工資</div>
+    </div>
+    <div class="range-controls">
+      <span>班表時段</span>
+      <input type="time" id="rangeStart" step="1800" value="08:00" />
+      <span>–</span>
+      <input type="time" id="rangeEnd" step="1800" value="22:00" />
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar-stack">
+      <div class="panel workers-panel">
+        <h2>工讀生</h2>
+        <div class="worker-list" id="workerList"></div>
+        <button class="add-worker-btn" id="addWorkerBtn">＋ 新增工讀生</button>
+        <div class="paintbrush-hint">點選姓名選為目前的「畫筆」，再到下方選一個攤位（可選「不指定」）。接著在右方班表上點擊或拖曳半小時格子，即可加入、移動或移除該工讀生的班。最左邊的核取方塊可勾選是否要把這位工讀生包含在匯出檔案中。</div>
+      </div>
+      <div class="panel stations-panel">
+        <h2>攤位</h2>
+        <div class="station-list" id="stationList"></div>
+        <button class="add-station-btn" id="addStationBtn">＋ 新增攤位</button>
+        <div class="paintbrush-hint">選擇工讀生要在哪個攤位工作，讓同一天不同工讀生可以標示到不同攤位。再次點擊同一位工讀生＋同一攤位的格子可取消。最左邊的核取方塊可勾選是否要把這個攤位包含在匯出檔案中。</div>
+      </div>
+    </aside>
+
+    <main class="panel schedule-panel">
+      <div class="schedule-toolbar">
+        <h2>週班表</h2>
+        <div class="week-nav">
+          <button class="week-step" id="weekPrevBtn" title="上一週" aria-label="上一週">‹</button>
+          <span class="week-range" id="weekRangeLabel"></span>
+          <input type="date" id="weekDateInput" class="date-field" aria-label="選擇日期以跳到該週" />
+          <button class="week-step" id="weekNextBtn" title="下一週" aria-label="下一週">›</button>
+        </div>
+        <button class="btn danger" id="clearScheduleBtn">清空本週班表</button>
+      </div>
+      <div class="summary-range">
+        <span>匯出區間</span>
+        <input type="date" id="scheduleExportStart" class="date-field" aria-label="匯出起始日期" />
+        <span class="sep">–</span>
+        <input type="date" id="scheduleExportEnd" class="date-field" aria-label="匯出結束日期" />
+        <button class="btn" id="scheduleExportSyncWeekBtn" title="套用目前顯示的週次">套用目前週次</button>
+        <button class="btn" id="exportScheduleCsvBtn">匯出班表 CSV</button>
+      </div>
+      <div class="grid-scroll">
+        <table class="schedule-grid" id="scheduleGrid"></table>
+      </div>
+    </main>
+  </div>
+
+  <section class="panel summary-panel">
+    <div class="head-row">
+      <h2 id="summaryHeading">工資統計</h2>
+      <button class="btn" id="exportCsvBtn">匯出 CSV</button>
+    </div>
+    <div class="summary-range">
+      <span>統計區間</span>
+      <input type="date" id="summaryRangeStart" class="date-field" aria-label="統計起始日期" />
+      <span class="sep">–</span>
+      <input type="date" id="summaryRangeEnd" class="date-field" aria-label="統計結束日期" />
+      <button class="btn" id="summarySyncWeekBtn" title="套用目前顯示的週次">套用目前週次</button>
+    </div>
+    <table class="summary-table" id="summaryTable"></table>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "shift-scheduler-v1";
+  var DAYS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"];
+  var WEEKEND_INDEXES = [5, 6];
+  var PALETTE = [
+    "#a8752c", "#2f6f5c", "#6b5b95", "#3f6b8c",
+    "#a35c3a", "#6b7a3a", "#8a4f6b", "#4a7a7a"
+  ];
+
+  function getMonday(date) {
+    var d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    var day = d.getDay(); // 0 = Sun ... 6 = Sat
+    var diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  function toISODate(d) {
+    var y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+    return y + "-" + (m < 10 ? "0" + m : m) + "-" + (day < 10 ? "0" + day : day);
+  }
+
+  function addDaysISO(iso, n) {
+    var d = new Date(iso + "T00:00:00");
+    d.setDate(d.getDate() + n);
+    return toISODate(d);
+  }
+
+  function formatMD(iso) {
+    var parts = iso.split("-");
+    return parts[1] + "/" + parts[2];
+  }
+
+  var TODAY_ISO = toISODate(new Date());
+
+  var state = loadState();
+  var selectedWorkerId = state.workers.length ? state.workers[0].id : null;
+  var selectedStationId = null; // null = "不指定" (no station tag)
+  var dragState = null; // { action: 'add' | 'remove', stationId, touched: Set }
+
+  function migrateCellFormat(schedule) {
+    // old format: schedule[key] = [workerId, ...]
+    // new format: schedule[key] = { workerId: stationId|null, ... }
+    Object.keys(schedule).forEach(function (key) {
+      if (Array.isArray(schedule[key])) {
+        var obj = {};
+        schedule[key].forEach(function (wid) { obj[wid] = null; });
+        schedule[key] = obj;
+      }
+    });
+  }
+
+  function loadState() {
+    var defaultWeekStart = toISODate(getMonday(new Date()));
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.workers)) {
+          if (!parsed.rangeStart) parsed.rangeStart = "08:00";
+          if (!parsed.rangeEnd) parsed.rangeEnd = "22:00";
+          if (parsed.schedule && !parsed.scheduleByWeek) {
+            // migrate old single-week format into the dated week structure
+            parsed.scheduleByWeek = {};
+            parsed.scheduleByWeek[defaultWeekStart] = parsed.schedule;
+            delete parsed.schedule;
+          }
+          if (!parsed.scheduleByWeek) parsed.scheduleByWeek = {};
+          Object.keys(parsed.scheduleByWeek).forEach(function (weekKey) {
+            migrateCellFormat(parsed.scheduleByWeek[weekKey]);
+          });
+          if (!parsed.weekStart) parsed.weekStart = defaultWeekStart;
+          if (!parsed.summaryRangeStart) parsed.summaryRangeStart = parsed.weekStart;
+          if (!parsed.summaryRangeEnd) parsed.summaryRangeEnd = addDaysISO(parsed.weekStart, 6);
+          if (!parsed.scheduleExportRangeStart) parsed.scheduleExportRangeStart = parsed.weekStart;
+          if (!parsed.scheduleExportRangeEnd) parsed.scheduleExportRangeEnd = addDaysISO(parsed.weekStart, 6);
+          if (!Array.isArray(parsed.stations)) parsed.stations = [];
+          return parsed;
+        }
+      }
+    } catch (e) { /* fall through to default */ }
+    return {
+      workers: [
+        { id: uid(), name: "小美", rate: 190, color: PALETTE[0] },
+        { id: uid(), name: "阿凱", rate: 183, color: PALETTE[1] }
+      ],
+      stations: [
+        { id: uid(), name: "收銀台", color: PALETTE[2] },
+        { id: uid(), name: "外場", color: PALETTE[3] }
+      ],
+      scheduleByWeek: {},
+      weekStart: defaultWeekStart,
+      summaryRangeStart: defaultWeekStart,
+      summaryRangeEnd: addDaysISO(defaultWeekStart, 6),
+      scheduleExportRangeStart: defaultWeekStart,
+      scheduleExportRangeEnd: addDaysISO(defaultWeekStart, 6),
+      rangeStart: "08:00",
+      rangeEnd: "22:00"
+    };
+  }
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function uid() {
+    return Math.random().toString(36).slice(2, 10);
+  }
+
+  function getCurrentSchedule() {
+    if (!state.scheduleByWeek[state.weekStart]) state.scheduleByWeek[state.weekStart] = {};
+    return state.scheduleByWeek[state.weekStart];
+  }
+
+  function nextColor() {
+    var used = state.workers.map(function (w) { return w.color; });
+    for (var i = 0; i < PALETTE.length; i++) {
+      if (used.indexOf(PALETTE[i]) === -1) return PALETTE[i];
+    }
+    return PALETTE[state.workers.length % PALETTE.length];
+  }
+
+  function nextStationColor() {
+    var used = state.stations.map(function (s) { return s.color; });
+    for (var i = 0; i < PALETTE.length; i++) {
+      if (used.indexOf(PALETTE[i]) === -1) return PALETTE[i];
+    }
+    return PALETTE[state.stations.length % PALETTE.length];
+  }
+
+  function timeToMinutes(t) {
+    var parts = t.split(":");
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  function minutesToTime(m) {
+    var h = Math.floor(m / 60);
+    var mm = m % 60;
+    return (h < 10 ? "0" + h : "" + h) + ":" + (mm < 10 ? "0" + mm : "" + mm);
+  }
+
+  function getSlots() {
+    var start = timeToMinutes(state.rangeStart);
+    var end = timeToMinutes(state.rangeEnd);
+    if (end <= start) end = start + 60;
+    var slots = [];
+    for (var m = start; m < end; m += 30) slots.push(minutesToTime(m));
+    return slots;
+  }
+
+  function cellKey(dayIndex, slot) {
+    return dayIndex + "_" + slot;
+  }
+
+  function workerById(id) {
+    for (var i = 0; i < state.workers.length; i++) {
+      if (state.workers[i].id === id) return state.workers[i];
+    }
+    return null;
+  }
+
+  function stationById(id) {
+    for (var i = 0; i < state.stations.length; i++) {
+      if (state.stations[i].id === id) return state.stations[i];
+    }
+    return null;
+  }
+
+  // ---------- Workers panel ----------
+  function renderWorkers() {
+    var list = document.getElementById("workerList");
+    list.innerHTML = "";
+    state.workers.forEach(function (w) {
+      var card = document.createElement("div");
+      card.className = "worker-card" + (w.id === selectedWorkerId ? " selected" : "");
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+
+      var includeBox = document.createElement("input");
+      includeBox.type = "checkbox";
+      includeBox.className = "include-check";
+      includeBox.checked = w.include !== false;
+      includeBox.title = "包含在匯出檔案中";
+      includeBox.setAttribute("aria-label", "是否包含在匯出檔案中");
+      includeBox.addEventListener("click", function (e) { e.stopPropagation(); });
+      includeBox.addEventListener("change", function () {
+        w.include = includeBox.checked;
+        saveState();
+      });
+      card.appendChild(includeBox);
+
+      var dot = document.createElement("input");
+      dot.type = "color";
+      dot.className = "worker-dot";
+      dot.value = w.color;
+      dot.title = "自訂顏色";
+      dot.setAttribute("aria-label", "選擇工讀生顏色");
+      dot.addEventListener("click", function (e) { e.stopPropagation(); });
+      dot.addEventListener("input", function () {
+        w.color = dot.value;
+        saveState();
+        renderGrid();
+        renderSummary();
+      });
+      card.appendChild(dot);
+
+      var nameInput = document.createElement("input");
+      nameInput.className = "worker-name";
+      nameInput.value = w.name;
+      nameInput.setAttribute("aria-label", "工讀生姓名");
+      nameInput.addEventListener("click", function (e) { e.stopPropagation(); });
+      nameInput.addEventListener("change", function () {
+        w.name = nameInput.value.trim() || "未命名";
+        saveState();
+        renderSummary();
+      });
+      card.appendChild(nameInput);
+
+      var rateWrap = document.createElement("input");
+      rateWrap.className = "worker-rate";
+      rateWrap.type = "number";
+      rateWrap.min = "0";
+      rateWrap.step = "1";
+      rateWrap.value = w.rate;
+      rateWrap.setAttribute("aria-label", "時薪");
+      rateWrap.addEventListener("click", function (e) { e.stopPropagation(); });
+      rateWrap.addEventListener("change", function () {
+        var v = parseFloat(rateWrap.value);
+        w.rate = isFinite(v) && v >= 0 ? v : 0;
+        rateWrap.value = w.rate;
+        saveState();
+        renderSummary();
+      });
+      card.appendChild(rateWrap);
+
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "worker-remove";
+      removeBtn.innerHTML = "&times;";
+      removeBtn.title = "移除工讀生";
+      removeBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!confirm("確定要移除「" + w.name + "」嗎？其班表紀錄也會一併移除。")) return;
+        removeWorker(w.id);
+      });
+      card.appendChild(removeBtn);
+
+      card.addEventListener("click", function () {
+        selectedWorkerId = w.id;
+        renderWorkers();
+      });
+      card.addEventListener("keydown", function (e) {
+        // only handle keys landing on the card itself (space/enter to activate it
+        // via keyboard focus) — ignore keys bubbling up from the name/rate inputs,
+        // otherwise intercepting Space here breaks IME composition (e.g. Zhuyin
+        // first-tone candidate selection needs Space to reach the input).
+        if (e.target !== card) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          selectedWorkerId = w.id;
+          renderWorkers();
+        }
+      });
+
+      list.appendChild(card);
+    });
+  }
+
+  function removeWorker(id) {
+    state.workers = state.workers.filter(function (w) { return w.id !== id; });
+    Object.keys(state.scheduleByWeek).forEach(function (weekKey) {
+      var sched = state.scheduleByWeek[weekKey];
+      Object.keys(sched).forEach(function (key) {
+        delete sched[key][id];
+        if (Object.keys(sched[key]).length === 0) delete sched[key];
+      });
+    });
+    if (selectedWorkerId === id) {
+      selectedWorkerId = state.workers.length ? state.workers[0].id : null;
+    }
+    saveState();
+    renderAll();
+  }
+
+  document.getElementById("addWorkerBtn").addEventListener("click", function () {
+    var w = { id: uid(), name: "新工讀生", rate: 183, color: nextColor(), include: true };
+    state.workers.push(w);
+    selectedWorkerId = w.id;
+    saveState();
+    renderAll();
+  });
+
+  // ---------- Stations panel ----------
+  function renderStations() {
+    var list = document.getElementById("stationList");
+    list.innerHTML = "";
+
+    var noneCard = document.createElement("div");
+    noneCard.className = "station-card" + (selectedStationId === null ? " selected" : "");
+    noneCard.setAttribute("role", "button");
+    noneCard.setAttribute("tabindex", "0");
+    var noneSwatch = document.createElement("span");
+    noneSwatch.className = "station-swatch none";
+    noneCard.appendChild(noneSwatch);
+    var noneLabel = document.createElement("span");
+    noneLabel.className = "station-label";
+    noneLabel.textContent = "不指定";
+    noneCard.appendChild(noneLabel);
+    noneCard.addEventListener("click", function () {
+      selectedStationId = null;
+      renderStations();
+    });
+    noneCard.addEventListener("keydown", function (e) {
+      if (e.target !== noneCard) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        selectedStationId = null;
+        renderStations();
+      }
+    });
+    list.appendChild(noneCard);
+
+    state.stations.forEach(function (s) {
+      var card = document.createElement("div");
+      card.className = "station-card" + (s.id === selectedStationId ? " selected" : "");
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+
+      var includeBox = document.createElement("input");
+      includeBox.type = "checkbox";
+      includeBox.className = "include-check";
+      includeBox.checked = s.include !== false;
+      includeBox.title = "包含在匯出檔案中";
+      includeBox.setAttribute("aria-label", "是否包含在匯出檔案中");
+      includeBox.addEventListener("click", function (e) { e.stopPropagation(); });
+      includeBox.addEventListener("change", function () {
+        s.include = includeBox.checked;
+        saveState();
+      });
+      card.appendChild(includeBox);
+
+      var swatch = document.createElement("input");
+      swatch.type = "color";
+      swatch.className = "station-swatch";
+      swatch.value = s.color;
+      swatch.title = "自訂顏色";
+      swatch.setAttribute("aria-label", "選擇攤位顏色");
+      swatch.addEventListener("click", function (e) { e.stopPropagation(); });
+      swatch.addEventListener("input", function () {
+        s.color = swatch.value;
+        saveState();
+        renderGrid();
+      });
+      card.appendChild(swatch);
+
+      var nameInput = document.createElement("input");
+      nameInput.className = "station-name";
+      nameInput.value = s.name;
+      nameInput.setAttribute("aria-label", "攤位名稱");
+      nameInput.addEventListener("click", function (e) { e.stopPropagation(); });
+      nameInput.addEventListener("change", function () {
+        s.name = nameInput.value.trim() || "未命名攤位";
+        saveState();
+        renderGrid();
+      });
+      card.appendChild(nameInput);
+
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "worker-remove";
+      removeBtn.innerHTML = "&times;";
+      removeBtn.title = "移除攤位";
+      removeBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!confirm("確定要移除「" + s.name + "」嗎？已排的班會保留工讀生，只是取消攤位標示。")) return;
+        removeStation(s.id);
+      });
+      card.appendChild(removeBtn);
+
+      card.addEventListener("click", function () {
+        selectedStationId = s.id;
+        renderStations();
+      });
+      card.addEventListener("keydown", function (e) {
+        if (e.target !== card) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          selectedStationId = s.id;
+          renderStations();
+        }
+      });
+
+      list.appendChild(card);
+    });
+  }
+
+  function removeStation(id) {
+    state.stations = state.stations.filter(function (s) { return s.id !== id; });
+    Object.keys(state.scheduleByWeek).forEach(function (weekKey) {
+      var sched = state.scheduleByWeek[weekKey];
+      Object.keys(sched).forEach(function (key) {
+        var cell = sched[key];
+        Object.keys(cell).forEach(function (wid) {
+          if (cell[wid] === id) cell[wid] = null;
+        });
+      });
+    });
+    if (selectedStationId === id) selectedStationId = null;
+    saveState();
+    renderAll();
+  }
+
+  document.getElementById("addStationBtn").addEventListener("click", function () {
+    var s = { id: uid(), name: "新攤位", color: nextStationColor(), include: true };
+    state.stations.push(s);
+    selectedStationId = s.id;
+    saveState();
+    renderAll();
+  });
+
+  // ---------- Schedule grid ----------
+  function renderGrid() {
+    var table = document.getElementById("scheduleGrid");
+    var slots = getSlots();
+    table.innerHTML = "";
+
+    var thead = document.createElement("thead");
+    var headRow = document.createElement("tr");
+    var corner = document.createElement("th");
+    corner.className = "corner";
+    headRow.appendChild(corner);
+    DAYS.forEach(function (label, di) {
+      var th = document.createElement("th");
+      var dateIso = addDaysISO(state.weekStart, di);
+      var classes = [];
+      if (WEEKEND_INDEXES.indexOf(di) !== -1) classes.push("weekend");
+      if (dateIso === TODAY_ISO) classes.push("today");
+      if (classes.length) th.className = classes.join(" ");
+      th.innerHTML =
+        "<span class=\"weekday\">" + label + "</span>" +
+        "<span class=\"date-sub\">" + formatMD(dateIso) + "</span>";
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var schedule = getCurrentSchedule();
+    var tbody = document.createElement("tbody");
+    slots.forEach(function (slot) {
+      var tr = document.createElement("tr");
+      if (slot.slice(3) === "00") tr.className = "hour-start";
+
+      var th = document.createElement("th");
+      th.className = "time-label";
+      th.textContent = slot.slice(3) === "00" ? slot : "";
+      tr.appendChild(th);
+
+      DAYS.forEach(function (_, di) {
+        var td = document.createElement("td");
+        td.className = "cell" + (WEEKEND_INDEXES.indexOf(di) !== -1 ? " weekend" : "");
+        td.dataset.day = di;
+        td.dataset.slot = slot;
+
+        var fill = document.createElement("div");
+        fill.className = "cell-fill";
+        var key = cellKey(di, slot);
+        var cell = schedule[key] || {};
+        Object.keys(cell).forEach(function (wid) {
+          var badge = buildBadge(wid, cell[wid]);
+          if (badge) fill.appendChild(badge);
+        });
+        td.appendChild(fill);
+        tr.appendChild(td);
+      });
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+  }
+
+  function buildBadge(workerId, stationId) {
+    var w = workerById(workerId);
+    if (!w) return null;
+    var station = stationId ? stationById(stationId) : null;
+    var badge = document.createElement("span");
+    badge.className = "badge";
+    badge.style.background = w.color;
+    badge.style.boxShadow = station
+      ? "0 0 0 2px " + station.color
+      : "0 0 0 1px var(--line-strong)";
+    badge.title = w.name + (station ? "・" + station.name : "");
+    badge.textContent = w.name.slice(0, 1);
+    return badge;
+  }
+
+  function toggleCell(day, slot, workerId, stationId, action) {
+    var schedule = getCurrentSchedule();
+    var key = cellKey(day, slot);
+    var cell = schedule[key] || {};
+    var hasExactMatch = Object.prototype.hasOwnProperty.call(cell, workerId) && cell[workerId] === stationId;
+    if (action === "add") {
+      if (hasExactMatch) return false;
+      cell[workerId] = stationId;
+    } else { // "remove"
+      if (!hasExactMatch) return false;
+      delete cell[workerId];
+    }
+    if (Object.keys(cell).length === 0) delete schedule[key];
+    else schedule[key] = cell;
+    return true;
+  }
+
+  function applyToCellElement(td) {
+    if (!selectedWorkerId || !dragState) return;
+    var day = parseInt(td.dataset.day, 10);
+    var slot = td.dataset.slot;
+    var key = cellKey(day, slot);
+    if (dragState.touched.has(key)) return;
+    dragState.touched.add(key);
+    var changed = toggleCell(day, slot, selectedWorkerId, dragState.stationId, dragState.action);
+    if (changed) {
+      refreshCell(td, day, slot);
+      saveState();
+      renderSummary();
+    }
+  }
+
+  function refreshCell(td, day, slot) {
+    var fill = td.querySelector(".cell-fill");
+    fill.innerHTML = "";
+    var key = cellKey(day, slot);
+    var cell = getCurrentSchedule()[key] || {};
+    Object.keys(cell).forEach(function (wid) {
+      var badge = buildBadge(wid, cell[wid]);
+      if (badge) fill.appendChild(badge);
+    });
+  }
+
+  function attachGridInteraction() {
+    // Attached once: the table node persists across renderGrid() calls (only its
+    // innerHTML is replaced), so binding this inside renderGrid would stack a new
+    // listener on every re-render and cause duplicate/cancelling toggles.
+    var table = document.getElementById("scheduleGrid");
+    table.addEventListener("pointerdown", function (e) {
+      var td = e.target.closest("td.cell");
+      if (!td || !selectedWorkerId) return;
+      e.preventDefault();
+      var day = parseInt(td.dataset.day, 10);
+      var slot = td.dataset.slot;
+      var key = cellKey(day, slot);
+      var cell = getCurrentSchedule()[key] || {};
+      var hasExactMatch = Object.prototype.hasOwnProperty.call(cell, selectedWorkerId) && cell[selectedWorkerId] === selectedStationId;
+      dragState = { action: hasExactMatch ? "remove" : "add", stationId: selectedStationId, touched: new Set() };
+      applyToCellElement(td);
+
+      function onMove(ev) {
+        var point = ev.touches ? ev.touches[0] : ev;
+        var el = document.elementFromPoint(point.clientX, point.clientY);
+        var overTd = el && el.closest ? el.closest("td.cell") : null;
+        if (overTd) applyToCellElement(overTd);
+      }
+      function onUp() {
+        dragState = null;
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      }
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+  }
+
+  document.getElementById("clearScheduleBtn").addEventListener("click", function () {
+    if (!confirm("確定要清空 " + weekRangeText() + " 的班表嗎？此動作無法復原。")) return;
+    state.scheduleByWeek[state.weekStart] = {};
+    saveState();
+    renderGrid();
+    renderSummary();
+  });
+
+  document.getElementById("rangeStart").addEventListener("change", function (e) {
+    state.rangeStart = e.target.value || "08:00";
+    saveState();
+    renderGrid();
+  });
+  document.getElementById("rangeEnd").addEventListener("change", function (e) {
+    state.rangeEnd = e.target.value || "22:00";
+    saveState();
+    renderGrid();
+  });
+
+  // ---------- Week navigation ----------
+  function weekRangeText() {
+    var endIso = addDaysISO(state.weekStart, 6);
+    return formatMD(state.weekStart) + " – " + formatMD(endIso);
+  }
+
+  function goToWeek(weekStartIso) {
+    state.weekStart = weekStartIso;
+    saveState();
+    renderWeekNav();
+    renderGrid();
+    renderSummary();
+  }
+
+  function renderWeekNav() {
+    document.getElementById("weekRangeLabel").textContent = weekRangeText();
+    document.getElementById("weekDateInput").value = state.weekStart;
+  }
+
+  document.getElementById("weekPrevBtn").addEventListener("click", function () {
+    goToWeek(addDaysISO(state.weekStart, -7));
+  });
+  document.getElementById("weekNextBtn").addEventListener("click", function () {
+    goToWeek(addDaysISO(state.weekStart, 7));
+  });
+  document.getElementById("weekDateInput").addEventListener("change", function (e) {
+    if (!e.target.value) return;
+    goToWeek(toISODate(getMonday(new Date(e.target.value + "T00:00:00"))));
+  });
+
+  // ---------- Summary ----------
+  var MAX_SUMMARY_DAYS = 1826; // ~5 years, guards against a runaway loop on a bad date
+
+  function eachDateInRange(startIso, endIso) {
+    var start = new Date(startIso + "T00:00:00");
+    var end = new Date(endIso + "T00:00:00");
+    if (end < start) { var tmp = start; start = end; end = tmp; }
+    var dates = [];
+    var cursor = new Date(start);
+    while (cursor <= end && dates.length < MAX_SUMMARY_DAYS) {
+      dates.push(toISODate(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return dates;
+  }
+
+  function getSummaryRange() {
+    var start = state.summaryRangeStart || state.weekStart;
+    var end = state.summaryRangeEnd || addDaysISO(state.weekStart, 6);
+    if (end < start) { var tmp = start; start = end; end = tmp; }
+    return { start: start, end: end };
+  }
+
+  function getScheduleExportRange() {
+    var start = state.scheduleExportRangeStart || state.weekStart;
+    var end = state.scheduleExportRangeEnd || addDaysISO(state.weekStart, 6);
+    if (end < start) { var tmp = start; start = end; end = tmp; }
+    return { start: start, end: end };
+  }
+
+  // Maps an arbitrary date to the Monday of its week (which keys scheduleByWeek)
+  // plus its 0-6 day index within that week (which keys DAYS / cellKey).
+  function weekMondayAndDayIndex(dateIso) {
+    var monday = toISODate(getMonday(new Date(dateIso + "T00:00:00")));
+    var dayIndex = Math.round(
+      (new Date(dateIso + "T00:00:00") - new Date(monday + "T00:00:00")) / 86400000
+    );
+    return { monday: monday, dayIndex: dayIndex };
+  }
+
+  function computeSummary() {
+    var range = getSummaryRange();
+    var totals = {};
+    state.workers.forEach(function (w) { totals[w.id] = 0; });
+    eachDateInRange(range.start, range.end).forEach(function (dateIso) {
+      var wmd = weekMondayAndDayIndex(dateIso);
+      var monday = wmd.monday, dayIndex = wmd.dayIndex;
+      var schedule = state.scheduleByWeek[monday];
+      if (!schedule) return;
+      var prefix = dayIndex + "_";
+      Object.keys(schedule).forEach(function (key) {
+        if (key.indexOf(prefix) !== 0) return;
+        Object.keys(schedule[key]).forEach(function (wid) {
+          if (totals[wid] === undefined) return;
+          totals[wid] += 0.5;
+        });
+      });
+    });
+    return totals;
+  }
+
+  function summaryRangeText() {
+    var range = getSummaryRange();
+    return formatMD(range.start) + " – " + formatMD(range.end);
+  }
+
+  function formatMoney(n) {
+    return "NT$" + Math.round(n).toLocaleString("zh-TW");
+  }
+
+  function renderSummary() {
+    document.getElementById("summaryHeading").textContent = "工資統計（" + summaryRangeText() + "）";
+    var table = document.getElementById("summaryTable");
+    table.innerHTML = "";
+    if (state.workers.length === 0) {
+      var note = document.createElement("div");
+      note.className = "empty-note";
+      note.textContent = "尚未新增工讀生。";
+      table.appendChild(note);
+      return;
+    }
+
+    var totals = computeSummary();
+    var thead = document.createElement("thead");
+    thead.innerHTML =
+      "<tr><th>姓名</th><th class=\"num\">時薪</th><th class=\"num\">時數</th><th class=\"num\">工資</th></tr>";
+    table.appendChild(thead);
+
+    var tbody = document.createElement("tbody");
+    var grandHours = 0, grandWage = 0;
+    state.workers.forEach(function (w) {
+      var hours = totals[w.id] || 0;
+      var wage = hours * w.rate;
+      grandHours += hours;
+      grandWage += wage;
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + escapeHtml(w.name) + "</td>" +
+        "<td class=\"num\">" + formatMoney(w.rate) + "</td>" +
+        "<td class=\"num\">" + hours.toFixed(1) + " 小時</td>" +
+        "<td class=\"num wage\">" + formatMoney(wage) + "</td>";
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    var tfoot = document.createElement("tfoot");
+    var totalRow = document.createElement("tr");
+    totalRow.className = "total-row";
+    totalRow.innerHTML =
+      "<td>合計</td><td class=\"num\"></td>" +
+      "<td class=\"num\">" + grandHours.toFixed(1) + " 小時</td>" +
+      "<td class=\"num\">" + formatMoney(grandWage) + "</td>";
+    tfoot.appendChild(totalRow);
+    table.appendChild(tfoot);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function rowsToCsv(rows) {
+    return "﻿" + rows.map(function (r) {
+      return r.map(function (v) { return "\"" + String(v).replace(/"/g, "\"\"") + "\""; }).join(",");
+    }).join("\r\n");
+  }
+
+  function downloadCsv(filename, csv) {
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    // Fallback for contexts where the download attribute is stripped/blocked
+    // (e.g. a sandboxed preview iframe): open the blob in a new tab so the
+    // user can still save it manually, instead of the click silently no-oping.
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Revoking immediately after click() can cancel the download in some
+    // browsers (notably Safari) before it has actually started reading the
+    // blob — defer it so the download/tab-open has time to grab the data.
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  document.getElementById("exportCsvBtn").addEventListener("click", function () {
+    var range = getSummaryRange();
+    var totals = computeSummary();
+    var rows = [["統計區間", formatMD(range.start) + " – " + formatMD(range.end)], []];
+    rows.push(["姓名", "時薪", "時數", "工資"]);
+    var grandHours = 0, grandWage = 0;
+    state.workers.filter(function (w) { return w.include !== false; }).forEach(function (w) {
+      var hours = totals[w.id] || 0;
+      var wage = hours * w.rate;
+      grandHours += hours;
+      grandWage += wage;
+      rows.push([w.name, w.rate, hours.toFixed(1), Math.round(wage)]);
+    });
+    rows.push(["合計", "", grandHours.toFixed(1), Math.round(grandWage)]);
+    downloadCsv(
+      "工讀生工資統計_" + range.start + "_至_" + range.end + ".csv",
+      rowsToCsv(rows)
+    );
+  });
+
+  document.getElementById("exportScheduleCsvBtn").addEventListener("click", function () {
+    var range = getScheduleExportRange();
+    var dates = eachDateInRange(range.start, range.end);
+    var slots = getSlots();
+    var header = ["時段"];
+    dates.forEach(function (dateIso) {
+      var dayIndex = weekMondayAndDayIndex(dateIso).dayIndex;
+      header.push(DAYS[dayIndex] + " " + formatMD(dateIso));
+    });
+    var rows = [header];
+    slots.forEach(function (slot) {
+      var row = [slot];
+      dates.forEach(function (dateIso) {
+        var wmd = weekMondayAndDayIndex(dateIso);
+        var weekSchedule = state.scheduleByWeek[wmd.monday] || {};
+        var cell = weekSchedule[cellKey(wmd.dayIndex, slot)] || {};
+        var names = Object.keys(cell)
+          .map(function (wid) {
+            var w = workerById(wid);
+            if (!w || w.include === false) return null;
+            var station = cell[wid] ? stationById(cell[wid]) : null;
+            if (station && station.include === false) return null;
+            return w.name + (station ? "(" + station.name + ")" : "");
+          })
+          .filter(Boolean);
+        row.push(names.join("、"));
+      });
+      rows.push(row);
+    });
+    downloadCsv(
+      "工讀生班表_" + range.start + "_至_" + range.end + ".csv",
+      rowsToCsv(rows)
+    );
+  });
+
+  document.getElementById("scheduleExportStart").addEventListener("change", function (e) {
+    if (!e.target.value) return;
+    state.scheduleExportRangeStart = e.target.value;
+    saveState();
+  });
+  document.getElementById("scheduleExportEnd").addEventListener("change", function (e) {
+    if (!e.target.value) return;
+    state.scheduleExportRangeEnd = e.target.value;
+    saveState();
+  });
+  document.getElementById("scheduleExportSyncWeekBtn").addEventListener("click", function () {
+    state.scheduleExportRangeStart = state.weekStart;
+    state.scheduleExportRangeEnd = addDaysISO(state.weekStart, 6);
+    saveState();
+    document.getElementById("scheduleExportStart").value = state.scheduleExportRangeStart;
+    document.getElementById("scheduleExportEnd").value = state.scheduleExportRangeEnd;
+  });
+
+  document.getElementById("summaryRangeStart").addEventListener("change", function (e) {
+    if (!e.target.value) return;
+    state.summaryRangeStart = e.target.value;
+    saveState();
+    renderSummary();
+  });
+  document.getElementById("summaryRangeEnd").addEventListener("change", function (e) {
+    if (!e.target.value) return;
+    state.summaryRangeEnd = e.target.value;
+    saveState();
+    renderSummary();
+  });
+  document.getElementById("summarySyncWeekBtn").addEventListener("click", function () {
+    state.summaryRangeStart = state.weekStart;
+    state.summaryRangeEnd = addDaysISO(state.weekStart, 6);
+    saveState();
+    document.getElementById("summaryRangeStart").value = state.summaryRangeStart;
+    document.getElementById("summaryRangeEnd").value = state.summaryRangeEnd;
+    renderSummary();
+  });
+
+  function renderAll() {
+    document.getElementById("rangeStart").value = state.rangeStart;
+    document.getElementById("rangeEnd").value = state.rangeEnd;
+    document.getElementById("summaryRangeStart").value = state.summaryRangeStart;
+    document.getElementById("summaryRangeEnd").value = state.summaryRangeEnd;
+    document.getElementById("scheduleExportStart").value = state.scheduleExportRangeStart;
+    document.getElementById("scheduleExportEnd").value = state.scheduleExportRangeEnd;
+    renderWeekNav();
+    renderWorkers();
+    renderStations();
+    renderGrid();
+    renderSummary();
+  }
+
+  attachGridInteraction();
+  renderAll();
+})();
+</script>
