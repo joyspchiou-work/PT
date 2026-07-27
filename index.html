@@ -410,6 +410,21 @@
     color: var(--muted);
   }
   .summary-range .sep { color: var(--muted); }
+  .notes-row { align-items: flex-start; }
+  .notes-row > span { padding-top: 6px; flex: none; }
+  .week-notes-input {
+    flex: 1 1 240px;
+    min-width: 200px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    line-height: 1.5;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 6px 8px;
+    background: var(--surface);
+    color: var(--ink);
+    resize: vertical;
+  }
   .share-link-input {
     flex: 1 1 220px;
     min-width: 140px;
@@ -594,6 +609,33 @@
     padding: 6px 2px;
   }
 
+  /* Notes shown in the read-only worker-facing share view */
+  .share-notes {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .share-notes-block + .share-notes-block {
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+  }
+  .share-notes-label {
+    font-family: var(--font-display);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 4px;
+  }
+  .share-notes-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink);
+    white-space: pre-wrap;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .worker-card, .station-card, .btn, td.cell { transition: background-color 120ms ease, border-color 120ms ease; }
   }
@@ -644,6 +686,10 @@
         <button class="btn" id="doneAvailabilityBtn" style="display:none;">完成，返回班表</button>
       </div>
       <div id="normalScheduleExtras">
+        <div class="summary-range notes-row">
+          <span>本週說明事項</span>
+          <textarea id="weekNotesInput" class="week-notes-input" rows="2" placeholder="例如：本週六公休、記得穿工作服、新到貨商品優先上架…（工讀生看分享連結時會看到）"></textarea>
+        </div>
         <div class="summary-range">
           <span>匯出區間</span>
           <input type="date" id="scheduleExportStart" class="date-field" aria-label="匯出起始日期" />
@@ -764,6 +810,7 @@
           if (!parsed.scheduleExportRangeStart) parsed.scheduleExportRangeStart = parsed.weekStart;
           if (!parsed.scheduleExportRangeEnd) parsed.scheduleExportRangeEnd = addDaysISO(parsed.weekStart, 6);
           if (!Array.isArray(parsed.stations)) parsed.stations = [];
+          if (!parsed.weekNotes) parsed.weekNotes = {};
           parsed.workers.forEach(function (w) {
             // availability used to be a recurring weekday pattern ("1_09:00");
             // it's now keyed by actual calendar date ("2026-08-03_09:00").
@@ -787,6 +834,7 @@
         { id: uid(), name: "外場", color: PALETTE[3] }
       ],
       scheduleByWeek: {},
+      weekNotes: {},
       weekStart: defaultWeekStart,
       summaryRangeStart: defaultWeekStart,
       summaryRangeEnd: addDaysISO(defaultWeekStart, 6),
@@ -1488,7 +1536,20 @@
   function renderWeekNav() {
     document.getElementById("weekRangeLabel").textContent = weekRangeText();
     document.getElementById("weekDateInput").value = state.weekStart;
+    renderWeekNotes();
   }
+
+  // ---------- Week notes (announcements shown to workers via the share link) ----------
+  function renderWeekNotes() {
+    document.getElementById("weekNotesInput").value = state.weekNotes[state.weekStart] || "";
+  }
+
+  document.getElementById("weekNotesInput").addEventListener("change", function (e) {
+    var text = e.target.value.trim();
+    if (text) state.weekNotes[state.weekStart] = text;
+    else delete state.weekNotes[state.weekStart];
+    saveState();
+  });
 
   document.getElementById("weekPrevBtn").addEventListener("click", function () {
     goToWeek(addDaysISO(state.weekStart, -7));
@@ -1550,9 +1611,12 @@
     var dates = eachDateInRange(range.start, range.end);
     var slots = getSlots();
     var cells = {};
+    var notesByWeek = {};
     dates.forEach(function (dateIso) {
       var wmd = weekMondayAndDayIndex(dateIso);
       var weekSchedule = state.scheduleByWeek[wmd.monday] || {};
+      var note = state.weekNotes[wmd.monday];
+      if (note && note.trim()) notesByWeek[wmd.monday] = note.trim();
       slots.forEach(function (slot) {
         var cell = weekSchedule[cellKey(wmd.dayIndex, slot)] || {};
         var assignments = Object.keys(cell).map(function (wid) {
@@ -1565,7 +1629,10 @@
         if (assignments.length) cells[dateIso + "_" + slot] = assignments;
       });
     });
-    return { start: range.start, end: range.end, slots: slots, cells: cells };
+    var notes = Object.keys(notesByWeek).sort().map(function (weekStart) {
+      return { start: weekStart, end: addDaysISO(weekStart, 6), text: notesByWeek[weekStart] };
+    });
+    return { start: range.start, end: range.end, slots: slots, cells: cells, notes: notes };
   }
 
   function encodeShareData(obj) {
@@ -1600,6 +1667,25 @@
     titleWrap.appendChild(sub);
     header.appendChild(titleWrap);
     app.appendChild(header);
+
+    if (data.notes && data.notes.length) {
+      var notesSection = document.createElement("section");
+      notesSection.className = "panel share-notes";
+      data.notes.forEach(function (n) {
+        var block = document.createElement("div");
+        block.className = "share-notes-block";
+        var label = document.createElement("div");
+        label.className = "share-notes-label";
+        label.textContent = formatMD(n.start) + " – " + formatMD(n.end) + " 說明事項";
+        var text = document.createElement("div");
+        text.className = "share-notes-text";
+        text.textContent = n.text;
+        block.appendChild(label);
+        block.appendChild(text);
+        notesSection.appendChild(block);
+      });
+      app.appendChild(notesSection);
+    }
 
     var main = document.createElement("main");
     main.className = "panel schedule-panel";
@@ -1795,12 +1881,25 @@
     var range = getScheduleExportRange();
     var dates = eachDateInRange(range.start, range.end);
     var slots = getSlots();
+
+    var notesByWeek = {};
+    dates.forEach(function (dateIso) {
+      var monday = weekMondayAndDayIndex(dateIso).monday;
+      var note = state.weekNotes[monday];
+      if (note && note.trim()) notesByWeek[monday] = note.trim();
+    });
+    var rows = [];
+    Object.keys(notesByWeek).sort().forEach(function (weekStart) {
+      rows.push(["說明事項（" + formatMD(weekStart) + " – " + formatMD(addDaysISO(weekStart, 6)) + "）", notesByWeek[weekStart]]);
+    });
+    if (rows.length) rows.push([]);
+
     var header = ["時段"];
     dates.forEach(function (dateIso) {
       var dayIndex = weekMondayAndDayIndex(dateIso).dayIndex;
       header.push(DAYS[dayIndex] + " " + formatMD(dateIso));
     });
-    var rows = [header];
+    rows.push(header);
     slots.forEach(function (slot) {
       var row = [slot];
       dates.forEach(function (dateIso) {
