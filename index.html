@@ -15,6 +15,7 @@
     --ledger: #2f6f5c;
     --ledger-tint: #2f6f5c1a;
     --rust: #a6432a;
+    --rust-tint: #a6432a12;
     --weekend-tint: #a8752c0d;
     --shadow: 0 1px 2px rgba(30, 42, 36, 0.06), 0 4px 14px rgba(30, 42, 36, 0.05);
     --radius: 10px;
@@ -38,6 +39,7 @@
       --ledger: #6cbc9f;
       --ledger-tint: #6cbc9f22;
       --rust: #e08063;
+      --rust-tint: #e0806322;
       --weekend-tint: #d9a54c14;
       --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
     }
@@ -55,6 +57,7 @@
     --ledger: #6cbc9f;
     --ledger-tint: #6cbc9f22;
     --rust: #e08063;
+    --rust-tint: #e0806322;
     --weekend-tint: #d9a54c14;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
   }
@@ -71,6 +74,7 @@
     --ledger: #2f6f5c;
     --ledger-tint: #2f6f5c1a;
     --rust: #a6432a;
+    --rust-tint: #a6432a12;
     --weekend-tint: #a8752c0d;
     --shadow: 0 1px 2px rgba(30, 42, 36, 0.06), 0 4px 14px rgba(30, 42, 36, 0.05);
   }
@@ -248,6 +252,19 @@
     cursor: pointer;
   }
   .worker-card .worker-remove:hover { background: var(--rust); color: #fff; }
+  .worker-avail-btn {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .worker-avail-btn:hover { background: var(--brass-tint-strong); color: var(--brass); }
 
   .station-list { display: flex; flex-direction: column; gap: 6px; }
   .station-card {
@@ -492,6 +509,16 @@
   }
   td.cell.weekend { background: var(--weekend-tint); }
   td.cell:hover { background: var(--brass-tint); }
+  td.cell.available { background: var(--cell-available-color, var(--brass-tint-strong)); }
+  td.cell.outside-availability {
+    background-color: var(--rust-tint);
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--rust) 0px, var(--rust) 1px,
+      transparent 1px, transparent 7px
+    );
+    opacity: 0.55;
+  }
   .cell-fill {
     display: flex;
     flex-wrap: wrap;
@@ -592,7 +619,7 @@
         <h2>工讀生</h2>
         <div class="worker-list" id="workerList"></div>
         <button class="add-worker-btn" id="addWorkerBtn">＋ 新增工讀生</button>
-        <div class="paintbrush-hint">點選姓名選為目前的「畫筆」，再到下方選一個攤位（可選「不指定」）。接著在右方班表上點擊或拖曳半小時格子，即可加入、移動或移除該工讀生的班。最左邊的核取方塊可勾選是否要把這位工讀生包含在匯出檔案中。</div>
+        <div class="paintbrush-hint">點選姓名選為目前的「畫筆」，再到下方選一個攤位（可選「不指定」）。接著在右方班表上點擊或拖曳半小時格子，即可加入、移動或移除該工讀生的班。最左邊的核取方塊可勾選是否要把這位工讀生包含在匯出檔案中。點時鐘圖示「⏰」可依實際日期設定這位工讀生可上班的時段（可用上一週／下一週切換不同週次分別設定），設定後排班時若排到範圍外會顯示提醒條紋（仍可照排，只是提醒）。</div>
       </div>
       <div class="panel stations-panel">
         <h2>攤位</h2>
@@ -604,7 +631,8 @@
 
     <main class="panel schedule-panel">
       <div class="schedule-toolbar">
-        <h2>週班表</h2>
+        <h2 id="scheduleModeTitle">週班表</h2>
+        <span class="week-range" id="availabilityModeLabel" style="display:none;"></span>
         <div class="week-nav">
           <button class="week-step" id="weekPrevBtn" title="上一週" aria-label="上一週">‹</button>
           <span class="week-range" id="weekRangeLabel"></span>
@@ -612,21 +640,25 @@
           <button class="week-step" id="weekNextBtn" title="下一週" aria-label="下一週">›</button>
         </div>
         <button class="btn danger" id="clearScheduleBtn">清空本週班表</button>
+        <button class="btn danger" id="clearAvailabilityBtn" style="display:none;">清空本週可上班設定</button>
+        <button class="btn" id="doneAvailabilityBtn" style="display:none;">完成，返回班表</button>
       </div>
-      <div class="summary-range">
-        <span>匯出區間</span>
-        <input type="date" id="scheduleExportStart" class="date-field" aria-label="匯出起始日期" />
-        <span class="sep">–</span>
-        <input type="date" id="scheduleExportEnd" class="date-field" aria-label="匯出結束日期" />
-        <button class="btn" id="scheduleExportSyncWeekBtn" title="套用目前顯示的週次">套用目前週次</button>
-        <button class="btn" id="exportScheduleCsvBtn">匯出班表 CSV</button>
-      </div>
-      <div class="summary-range">
-        <span>分享給工讀生</span>
-        <button class="btn" id="generateShareLinkBtn">產生班表連結（不含工資）</button>
-        <input type="text" id="shareLinkOutput" class="share-link-input" readonly aria-label="分享連結" placeholder="點擊左方按鈕，依「匯出區間」產生唯讀連結" />
-        <button class="btn" id="copyShareLinkBtn">複製連結</button>
-        <span class="share-status" id="shareStatus"></span>
+      <div id="normalScheduleExtras">
+        <div class="summary-range">
+          <span>匯出區間</span>
+          <input type="date" id="scheduleExportStart" class="date-field" aria-label="匯出起始日期" />
+          <span class="sep">–</span>
+          <input type="date" id="scheduleExportEnd" class="date-field" aria-label="匯出結束日期" />
+          <button class="btn" id="scheduleExportSyncWeekBtn" title="套用目前顯示的週次">套用目前週次</button>
+          <button class="btn" id="exportScheduleCsvBtn">匯出班表 CSV</button>
+        </div>
+        <div class="summary-range">
+          <span>分享給工讀生</span>
+          <button class="btn" id="generateShareLinkBtn">產生班表連結（不含工資）</button>
+          <input type="text" id="shareLinkOutput" class="share-link-input" readonly aria-label="分享連結" placeholder="點擊左方按鈕，依「匯出區間」產生唯讀連結" />
+          <button class="btn" id="copyShareLinkBtn">複製連結</button>
+          <span class="share-status" id="shareStatus"></span>
+        </div>
       </div>
       <div class="grid-scroll">
         <table class="schedule-grid" id="scheduleGrid"></table>
@@ -693,6 +725,7 @@
   var selectedWorkerId = state.workers.length ? state.workers[0].id : null;
   var selectedStationId = null; // null = "不指定" (no station tag)
   var dragState = null; // { action: 'add' | 'remove', stationId, touched: Set }
+  var editingAvailabilityWorkerId = null; // non-null while the grid is in "set availability" mode
 
   function migrateCellFormat(schedule) {
     // old format: schedule[key] = [workerId, ...]
@@ -731,6 +764,15 @@
           if (!parsed.scheduleExportRangeStart) parsed.scheduleExportRangeStart = parsed.weekStart;
           if (!parsed.scheduleExportRangeEnd) parsed.scheduleExportRangeEnd = addDaysISO(parsed.weekStart, 6);
           if (!Array.isArray(parsed.stations)) parsed.stations = [];
+          parsed.workers.forEach(function (w) {
+            // availability used to be a recurring weekday pattern ("1_09:00");
+            // it's now keyed by actual calendar date ("2026-08-03_09:00").
+            // Old-format entries can't be mapped to a real date, so drop them
+            // back to "no restriction" rather than showing bogus warnings.
+            if (w.availability && !isDateKeyedAvailability(w.availability)) {
+              w.availability = {};
+            }
+          });
           return parsed;
         }
       }
@@ -806,6 +848,15 @@
 
   function cellKey(dayIndex, slot) {
     return dayIndex + "_" + slot;
+  }
+
+  function availabilityKey(dateIso, slot) {
+    return dateIso + "_" + slot;
+  }
+
+  var DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}_/;
+  function isDateKeyedAvailability(availability) {
+    return Object.keys(availability).every(function (key) { return DATE_KEY_RE.test(key); });
   }
 
   function workerById(id) {
@@ -889,6 +940,17 @@
       });
       card.appendChild(rateWrap);
 
+      var availBtn = document.createElement("button");
+      availBtn.className = "worker-avail-btn";
+      availBtn.textContent = "⏰";
+      availBtn.title = "設定可上班時段";
+      availBtn.setAttribute("aria-label", "設定" + w.name + "的可上班時段");
+      availBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        enterAvailabilityMode(w.id);
+      });
+      card.appendChild(availBtn);
+
       var removeBtn = document.createElement("button");
       removeBtn.className = "worker-remove";
       removeBtn.innerHTML = "&times;";
@@ -903,6 +965,7 @@
       card.addEventListener("click", function () {
         selectedWorkerId = w.id;
         renderWorkers();
+        if (!editingAvailabilityWorkerId) renderGrid();
       });
       card.addEventListener("keydown", function (e) {
         // only handle keys landing on the card itself (space/enter to activate it
@@ -914,6 +977,7 @@
           e.preventDefault();
           selectedWorkerId = w.id;
           renderWorkers();
+          if (!editingAvailabilityWorkerId) renderGrid();
         }
       });
 
@@ -932,6 +996,10 @@
     });
     if (selectedWorkerId === id) {
       selectedWorkerId = state.workers.length ? state.workers[0].id : null;
+    }
+    if (editingAvailabilityWorkerId === id) {
+      editingAvailabilityWorkerId = null;
+      setAvailabilityToolbarVisible(false);
     }
     saveState();
     renderAll();
@@ -1073,11 +1141,9 @@
   });
 
   // ---------- Schedule grid ----------
-  function renderGrid() {
-    var table = document.getElementById("scheduleGrid");
-    var slots = getSlots();
-    table.innerHTML = "";
-
+  // Shared by the normal schedule grid and the availability grid — both are a
+  // Mon-Sun header for state.weekStart with real dates and a "today" mark.
+  function buildDatedHeaderRow() {
     var thead = document.createElement("thead");
     var headRow = document.createElement("tr");
     var corner = document.createElement("th");
@@ -1096,9 +1162,28 @@
       headRow.appendChild(th);
     });
     thead.appendChild(headRow);
-    table.appendChild(thead);
+    return thead;
+  }
+
+  function renderGrid() {
+    if (editingAvailabilityWorkerId) {
+      renderAvailabilityGrid();
+      return;
+    }
+    var table = document.getElementById("scheduleGrid");
+    var slots = getSlots();
+    table.innerHTML = "";
+    table.appendChild(buildDatedHeaderRow());
 
     var schedule = getCurrentSchedule();
+    // If the current paintbrush worker has any availability defined, cells
+    // outside that set get a soft warning stripe — a hint, not a hard block,
+    // since managers still need to be able to schedule exceptions.
+    var restrictedWorker = selectedWorkerId ? workerById(selectedWorkerId) : null;
+    var restriction = (restrictedWorker && restrictedWorker.availability && Object.keys(restrictedWorker.availability).length)
+      ? restrictedWorker.availability
+      : null;
+
     var tbody = document.createElement("tbody");
     slots.forEach(function (slot) {
       var tr = document.createElement("tr");
@@ -1111,13 +1196,17 @@
 
       DAYS.forEach(function (_, di) {
         var td = document.createElement("td");
-        td.className = "cell" + (WEEKEND_INDEXES.indexOf(di) !== -1 ? " weekend" : "");
+        var key = cellKey(di, slot);
+        var dateIso = addDaysISO(state.weekStart, di);
+        var classes = ["cell"];
+        if (WEEKEND_INDEXES.indexOf(di) !== -1) classes.push("weekend");
+        if (restriction && !restriction[availabilityKey(dateIso, slot)]) classes.push("outside-availability");
+        td.className = classes.join(" ");
         td.dataset.day = di;
         td.dataset.slot = slot;
 
         var fill = document.createElement("div");
         fill.className = "cell-fill";
-        var key = cellKey(di, slot);
         var cell = schedule[key] || {};
         Object.keys(cell).forEach(function (wid) {
           var badge = buildBadge(wid, cell[wid]);
@@ -1130,6 +1219,95 @@
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+  }
+
+  // ---------- Availability editing (per-worker, tied to real dates) ----------
+  function setAvailabilityToolbarVisible(isAvailabilityMode) {
+    document.getElementById("scheduleModeTitle").style.display = isAvailabilityMode ? "none" : "";
+    document.getElementById("availabilityModeLabel").style.display = isAvailabilityMode ? "" : "none";
+    document.getElementById("clearScheduleBtn").style.display = isAvailabilityMode ? "none" : "";
+    document.getElementById("clearAvailabilityBtn").style.display = isAvailabilityMode ? "" : "none";
+    document.getElementById("doneAvailabilityBtn").style.display = isAvailabilityMode ? "" : "none";
+    document.getElementById("normalScheduleExtras").style.display = isAvailabilityMode ? "none" : "";
+  }
+
+  function enterAvailabilityMode(workerId) {
+    editingAvailabilityWorkerId = workerId;
+    selectedWorkerId = workerId;
+    var w = workerById(workerId);
+    document.getElementById("availabilityModeLabel").textContent =
+      "正在設定「" + (w ? w.name : "") + "」的可上班時段";
+    setAvailabilityToolbarVisible(true);
+    renderWorkers();
+    renderGrid();
+  }
+
+  function exitAvailabilityMode() {
+    editingAvailabilityWorkerId = null;
+    setAvailabilityToolbarVisible(false);
+    renderWorkers();
+    renderGrid();
+  }
+
+  document.getElementById("doneAvailabilityBtn").addEventListener("click", exitAvailabilityMode);
+
+  document.getElementById("clearAvailabilityBtn").addEventListener("click", function () {
+    var w = workerById(editingAvailabilityWorkerId);
+    if (!w) return;
+    if (!confirm("確定要清空「" + w.name + "」" + weekRangeText() + " 這一週的可上班設定嗎？")) return;
+    if (!w.availability) w.availability = {};
+    var weekDates = [];
+    for (var di = 0; di < 7; di++) weekDates.push(addDaysISO(state.weekStart, di));
+    Object.keys(w.availability).forEach(function (key) {
+      if (weekDates.indexOf(key.split("_")[0]) !== -1) delete w.availability[key];
+    });
+    saveState();
+    renderGrid();
+  });
+
+  function renderAvailabilityGrid() {
+    var table = document.getElementById("scheduleGrid");
+    var slots = getSlots();
+    table.innerHTML = "";
+    var w = workerById(editingAvailabilityWorkerId);
+    if (!w) { exitAvailabilityMode(); return; }
+    if (!w.availability) w.availability = {};
+    var availability = w.availability;
+    table.appendChild(buildDatedHeaderRow());
+
+    var tbody = document.createElement("tbody");
+    slots.forEach(function (slot) {
+      var tr = document.createElement("tr");
+      if (slot.slice(3) === "00") tr.className = "hour-start";
+      var timeLabel = document.createElement("th");
+      timeLabel.className = "time-label";
+      timeLabel.textContent = slot.slice(3) === "00" ? slot : "";
+      tr.appendChild(timeLabel);
+
+      DAYS.forEach(function (_, di) {
+        var dateIso = addDaysISO(state.weekStart, di);
+        var key = availabilityKey(dateIso, slot);
+        var td = document.createElement("td");
+        var classes = ["cell"];
+        if (WEEKEND_INDEXES.indexOf(di) !== -1) classes.push("weekend");
+        if (availability[key]) classes.push("available");
+        td.className = classes.join(" ");
+        td.dataset.date = dateIso;
+        td.dataset.slot = slot;
+        td.style.background = availability[key] ? w.color + "55" : "";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+  }
+
+  function refreshAvailabilityCell(td, workerId, dateIso, slot) {
+    var w = workerById(workerId);
+    if (!w) return;
+    var available = !!(w.availability && w.availability[availabilityKey(dateIso, slot)]);
+    td.classList.toggle("available", available);
+    td.style.background = available ? w.color + "55" : "";
   }
 
   function buildBadge(workerId, stationId) {
@@ -1179,6 +1357,28 @@
     }
   }
 
+  function applyToAvailabilityCellElement(td) {
+    if (!editingAvailabilityWorkerId || !dragState) return;
+    var w = workerById(editingAvailabilityWorkerId);
+    if (!w) return;
+    var dateIso = td.dataset.date;
+    var slot = td.dataset.slot;
+    var key = availabilityKey(dateIso, slot);
+    if (dragState.touched.has(key)) return;
+    dragState.touched.add(key);
+    if (!w.availability) w.availability = {};
+    var has = !!w.availability[key];
+    if (dragState.action === "add" && !has) {
+      w.availability[key] = true;
+    } else if (dragState.action === "remove" && has) {
+      delete w.availability[key];
+    } else {
+      return;
+    }
+    refreshAvailabilityCell(td, w.id, dateIso, slot);
+    saveState();
+  }
+
   function refreshCell(td, day, slot) {
     var fill = td.querySelector(".cell-fill");
     fill.innerHTML = "";
@@ -1197,7 +1397,36 @@
     var table = document.getElementById("scheduleGrid");
     table.addEventListener("pointerdown", function (e) {
       var td = e.target.closest("td.cell");
-      if (!td || !selectedWorkerId) return;
+      if (!td) return;
+
+      if (editingAvailabilityWorkerId) {
+        e.preventDefault();
+        var w = workerById(editingAvailabilityWorkerId);
+        if (!w) return;
+        var aDate = td.dataset.date;
+        var aSlot = td.dataset.slot;
+        var aKey = availabilityKey(aDate, aSlot);
+        var wasAvailable = !!(w.availability && w.availability[aKey]);
+        dragState = { action: wasAvailable ? "remove" : "add", touched: new Set() };
+        applyToAvailabilityCellElement(td);
+
+        var onAvailMove = function (ev) {
+          var point = ev.touches ? ev.touches[0] : ev;
+          var el = document.elementFromPoint(point.clientX, point.clientY);
+          var overTd = el && el.closest ? el.closest("td.cell") : null;
+          if (overTd) applyToAvailabilityCellElement(overTd);
+        };
+        var onAvailUp = function () {
+          dragState = null;
+          window.removeEventListener("pointermove", onAvailMove);
+          window.removeEventListener("pointerup", onAvailUp);
+        };
+        window.addEventListener("pointermove", onAvailMove);
+        window.addEventListener("pointerup", onAvailUp);
+        return;
+      }
+
+      if (!selectedWorkerId) return;
       e.preventDefault();
       var day = parseInt(td.dataset.day, 10);
       var slot = td.dataset.slot;
