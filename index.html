@@ -122,6 +122,12 @@
     font-size: 13.5px;
     margin-top: 4px;
   }
+  header.topbar .topbar-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
   header.topbar .range-controls {
     display: flex;
     align-items: center;
@@ -647,11 +653,18 @@
       <h1>工讀生排班表</h1>
       <div class="sub">以半小時為單位安排班表，依各工讀生時薪自動計算工資</div>
     </div>
-    <div class="range-controls">
-      <span>班表時段</span>
-      <input type="time" id="rangeStart" step="1800" value="08:00" />
-      <span>–</span>
-      <input type="time" id="rangeEnd" step="1800" value="22:00" />
+    <div class="topbar-right">
+      <div class="range-controls">
+        <span>班表時段</span>
+        <input type="time" id="rangeStart" step="1800" value="08:00" />
+        <span>–</span>
+        <input type="time" id="rangeEnd" step="1800" value="22:00" />
+      </div>
+      <div class="range-controls">
+        <button class="btn" id="exportBackupBtn" title="把所有資料（工讀生、攤位、班表、說明事項）匯出成一個檔案">匯出完整備份</button>
+        <button class="btn" id="importBackupBtn" title="用備份檔案還原資料">還原備份</button>
+        <input type="file" id="importBackupFile" accept="application/json,.json" style="display:none;" />
+      </div>
     </div>
   </header>
 
@@ -785,6 +798,42 @@
     });
   }
 
+  // Fills in defaults/migrations for a raw parsed state object, whether it
+  // came from localStorage or an imported backup file — both need identical
+  // treatment so old/partial data never crashes the app.
+  function normalizeState(parsed) {
+    var defaultWeekStart = toISODate(getMonday(new Date()));
+    if (!parsed.rangeStart) parsed.rangeStart = "08:00";
+    if (!parsed.rangeEnd) parsed.rangeEnd = "22:00";
+    if (parsed.schedule && !parsed.scheduleByWeek) {
+      // migrate old single-week format into the dated week structure
+      parsed.scheduleByWeek = {};
+      parsed.scheduleByWeek[defaultWeekStart] = parsed.schedule;
+      delete parsed.schedule;
+    }
+    if (!parsed.scheduleByWeek) parsed.scheduleByWeek = {};
+    Object.keys(parsed.scheduleByWeek).forEach(function (weekKey) {
+      migrateCellFormat(parsed.scheduleByWeek[weekKey]);
+    });
+    if (!parsed.weekStart) parsed.weekStart = defaultWeekStart;
+    if (!parsed.summaryRangeStart) parsed.summaryRangeStart = parsed.weekStart;
+    if (!parsed.summaryRangeEnd) parsed.summaryRangeEnd = addDaysISO(parsed.weekStart, 6);
+    if (!parsed.scheduleExportRangeStart) parsed.scheduleExportRangeStart = parsed.weekStart;
+    if (!parsed.scheduleExportRangeEnd) parsed.scheduleExportRangeEnd = addDaysISO(parsed.weekStart, 6);
+    if (!Array.isArray(parsed.stations)) parsed.stations = [];
+    if (!parsed.weekNotes) parsed.weekNotes = {};
+    parsed.workers.forEach(function (w) {
+      // availability used to be a recurring weekday pattern ("1_09:00");
+      // it's now keyed by actual calendar date ("2026-08-03_09:00").
+      // Old-format entries can't be mapped to a real date, so drop them
+      // back to "no restriction" rather than showing bogus warnings.
+      if (w.availability && !isDateKeyedAvailability(w.availability)) {
+        w.availability = {};
+      }
+    });
+    return parsed;
+  }
+
   function loadState() {
     var defaultWeekStart = toISODate(getMonday(new Date()));
     try {
@@ -792,35 +841,7 @@
       if (raw) {
         var parsed = JSON.parse(raw);
         if (parsed && Array.isArray(parsed.workers)) {
-          if (!parsed.rangeStart) parsed.rangeStart = "08:00";
-          if (!parsed.rangeEnd) parsed.rangeEnd = "22:00";
-          if (parsed.schedule && !parsed.scheduleByWeek) {
-            // migrate old single-week format into the dated week structure
-            parsed.scheduleByWeek = {};
-            parsed.scheduleByWeek[defaultWeekStart] = parsed.schedule;
-            delete parsed.schedule;
-          }
-          if (!parsed.scheduleByWeek) parsed.scheduleByWeek = {};
-          Object.keys(parsed.scheduleByWeek).forEach(function (weekKey) {
-            migrateCellFormat(parsed.scheduleByWeek[weekKey]);
-          });
-          if (!parsed.weekStart) parsed.weekStart = defaultWeekStart;
-          if (!parsed.summaryRangeStart) parsed.summaryRangeStart = parsed.weekStart;
-          if (!parsed.summaryRangeEnd) parsed.summaryRangeEnd = addDaysISO(parsed.weekStart, 6);
-          if (!parsed.scheduleExportRangeStart) parsed.scheduleExportRangeStart = parsed.weekStart;
-          if (!parsed.scheduleExportRangeEnd) parsed.scheduleExportRangeEnd = addDaysISO(parsed.weekStart, 6);
-          if (!Array.isArray(parsed.stations)) parsed.stations = [];
-          if (!parsed.weekNotes) parsed.weekNotes = {};
-          parsed.workers.forEach(function (w) {
-            // availability used to be a recurring weekday pattern ("1_09:00");
-            // it's now keyed by actual calendar date ("2026-08-03_09:00").
-            // Old-format entries can't be mapped to a real date, so drop them
-            // back to "no restriction" rather than showing bogus warnings.
-            if (w.availability && !isDateKeyedAvailability(w.availability)) {
-              w.availability = {};
-            }
-          });
-          return parsed;
+          return normalizeState(parsed);
         }
       }
     } catch (e) { /* fall through to default */ }
@@ -1837,8 +1858,8 @@
     }).join("\r\n");
   }
 
-  function downloadCsv(filename, csv) {
-    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  function downloadFile(filename, content, mimeType) {
+    var blob = new Blob([content], { type: mimeType });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
@@ -1856,6 +1877,63 @@
     // blob — defer it so the download/tab-open has time to grab the data.
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }
+
+  function downloadCsv(filename, csv) {
+    downloadFile(filename, csv, "text/csv;charset=utf-8;");
+  }
+
+  // ---------- Full backup / restore ----------
+  // A safety net against data loss from the hosting environment (e.g. a
+  // sandboxed preview that doesn't persist localStorage reliably, browsers
+  // that clear site data, or moving to a new device) — the whole app state
+  // round-trips through one JSON file.
+  document.getElementById("exportBackupBtn").addEventListener("click", function () {
+    var today = toISODate(new Date());
+    downloadFile(
+      "工讀生排班表備份_" + today + ".json",
+      JSON.stringify(state, null, 2),
+      "application/json;charset=utf-8;"
+    );
+  });
+
+  document.getElementById("importBackupBtn").addEventListener("click", function () {
+    document.getElementById("importBackupFile").click();
+  });
+
+  document.getElementById("importBackupFile").addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var parsed;
+      try {
+        parsed = JSON.parse(reader.result);
+      } catch (err) {
+        alert("這個檔案不是有效的備份檔（JSON 格式錯誤）。");
+        return;
+      }
+      if (!parsed || !Array.isArray(parsed.workers)) {
+        alert("這個檔案看起來不是本工具的備份檔，找不到工讀生資料。");
+        return;
+      }
+      if (!confirm("確定要用「" + file.name + "」還原資料嗎？目前這個瀏覽器裡的所有資料會被覆蓋，此動作無法復原。")) {
+        return;
+      }
+      state = normalizeState(parsed);
+      selectedWorkerId = state.workers.length ? state.workers[0].id : null;
+      selectedStationId = null;
+      editingAvailabilityWorkerId = null;
+      setAvailabilityToolbarVisible(false);
+      saveState();
+      renderAll();
+      alert("已成功還原備份。");
+    };
+    reader.onerror = function () {
+      alert("讀取檔案時發生錯誤，請再試一次。");
+    };
+    reader.readAsText(file);
+  });
 
   document.getElementById("exportCsvBtn").addEventListener("click", function () {
     var range = getSummaryRange();
